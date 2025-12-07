@@ -554,6 +554,7 @@
         // --- step 4: download pdf ---
         window.jsPDF = window.jspdf.jsPDF;
 
+        // --- SỬA HÀM NÀY ---
         async function downloadPDF() {
             const element = document.getElementById('final-strip');
             const step3Div = document.getElementById('step-3');
@@ -565,27 +566,43 @@
             btn.disabled = true;
 
             try {
-                // 2. TRICK QUAN TRỌNG: Phải làm cho element hiện ra thì mới chụp được
-                // Ta sẽ lén hiển thị bước 3 nhưng đẩy nó ra khỏi màn hình để người dùng không thấy bị giật
+                // 2. TRICK MỚI: Hiển thị nhưng nằm chìm bên dưới (thay vì đẩy ra xa)
                 step3Div.classList.remove('hidden');
-                step3Div.style.position = 'absolute';
-                step3Div.style.left = '-9999px'; // Đẩy ra xa tít mù khơi
-                
-                // 3. Chụp ảnh
+                step3Div.style.position = 'fixed'; // Dùng fixed để nó nằm đè lên
+                step3Div.style.top = '0';
+                step3Div.style.left = '0';
+                step3Div.style.zIndex = '-9999'; // Nằm dưới cùng, người dùng không thấy
+                step3Div.style.opacity = '0'; // Trong suốt để chắc chắn không nháy hình
+
+                // 3. QUAN TRỌNG: Chờ 300ms để trình duyệt kịp "vẽ" xong element
+                await new Promise(resolve => setTimeout(resolve, 300));
+
+                // 4. Chụp ảnh
                 const canvas = await html2canvas(element, {
                     scale: 2,
-                    useCORS: true,
-                    logging: false
+                    useCORS: true, // Cho phép tải ảnh từ nguồn khác (nếu có)
+                    allowTaint: true,
+                    logging: false,
+                    backgroundColor: null // Giữ nền trong suốt nếu cần
                 });
 
-                // 4. Trả lại hiện trạng cũ ngay lập tức (Ẩn bước 3 đi)
+                // 5. Trả lại hiện trạng cũ (Ẩn bước 3 đi)
                 step3Div.style.position = ''; 
+                step3Div.style.top = '';
                 step3Div.style.left = '';
+                step3Div.style.zIndex = '';
+                step3Div.style.opacity = '';
                 step3Div.classList.add('hidden');
 
-                // 5. Tạo PDF
+                // 6. Tạo PDF
                 const imgData = canvas.toDataURL('image/png');
-                const { jsPDF } = window.jspdf; // Lấy jsPDF chuẩn từ window
+                
+                // Kiểm tra xem ảnh có dữ liệu không
+                if (imgData === 'data:,') {
+                    throw new Error("Không chụp được ảnh, vui lòng thử lại!");
+                }
+
+                const { jsPDF } = window.jspdf;
                 const pdf = new jsPDF('p', 'mm', 'a4');
                 
                 const pdfWidth = pdf.internal.pageSize.getWidth();
@@ -593,6 +610,7 @@
                 const imgWidth = imgProps.width;
                 const imgHeight = imgProps.height;
                 
+                // Tính toán tỷ lệ
                 const finalWidth = 100; 
                 const finalHeight = (imgHeight * finalWidth) / imgWidth;
                 const x = (pdfWidth - finalWidth) / 2;
@@ -601,18 +619,18 @@
                 pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
                 pdf.save(`photobooth-meo-${Date.now()}.pdf`);
 
-                // 6. Xong việc
-                btn.innerHTML = originalText;
-                btn.disabled = false;
-
             } catch (err) {
-                console.error("Lỗi rồi bạn ơi:", err);
-                alert("Có lỗi khi tạo PDF: " + err.message);
-                
-                // Dù lỗi cũng phải dọn dẹp hiện trường (trả lại style cũ)
+                console.error("Lỗi:", err);
+                alert("Lỗi khi tạo PDF: " + err.message);
+            } finally {
+                // 7. Dọn dẹp (Luôn chạy dù thành công hay thất bại)
                 step3Div.style.position = ''; 
+                step3Div.style.top = '';
                 step3Div.style.left = '';
+                step3Div.style.zIndex = '';
+                step3Div.style.opacity = '';
                 step3Div.classList.add('hidden');
+                
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             }
@@ -621,5 +639,6 @@
 </body>
 
 </html>
+
 
 
