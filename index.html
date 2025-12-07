@@ -554,10 +554,9 @@
         // --- step 4: download pdf ---
         window.jsPDF = window.jspdf.jsPDF;
 
-        // --- SỬA HÀM NÀY ---
+        // --- SỬA LẠI HÀM NÀY (CÁCH CLONE) ---
         async function downloadPDF() {
             const element = document.getElementById('final-strip');
-            const step3Div = document.getElementById('step-3');
             const btn = document.querySelector('#step-4 button'); 
             
             // 1. Báo hiệu đang xử lý
@@ -565,41 +564,51 @@
             btn.innerHTML = 'đang xử lý... <i class="fas fa-spinner fa-spin"></i>';
             btn.disabled = true;
 
+            // Biến chứa bản sao
+            let clone = null;
+
             try {
-                // 2. TRICK MỚI: Hiển thị nhưng nằm chìm bên dưới (thay vì đẩy ra xa)
-                step3Div.classList.remove('hidden');
-                step3Div.style.position = 'fixed'; // Dùng fixed để nó nằm đè lên
-                step3Div.style.top = '0';
-                step3Div.style.left = '0';
-                step3Div.style.zIndex = '-9999'; // Nằm dưới cùng, người dùng không thấy
-                step3Div.style.opacity = '0'; // Trong suốt để chắc chắn không nháy hình
+                // 2. TẠO BẢN SAO (CLONE) của dải ảnh
+                // Chúng ta copy y nguyên dải ảnh ra một cái mới
+                clone = element.cloneNode(true);
 
-                // 3. QUAN TRỌNG: Chờ 300ms để trình duyệt kịp "vẽ" xong element
-                await new Promise(resolve => setTimeout(resolve, 300));
+                // 3. Thiết lập style bắt buộc cho bản sao để nó luôn hiện
+                // Đưa nó ra khỏi màn hình (-10000px) nhưng vẫn để chế độ hiển thị
+                clone.style.position = 'fixed';
+                clone.style.left = '-10000px'; 
+                clone.style.top = '0px';
+                clone.style.zIndex = '-1';
+                clone.style.display = 'grid'; // Bắt buộc dùng grid giống CSS gốc
+                clone.style.visibility = 'visible'; // Bắt buộc hiện
+                
+                // Copy background màu hiện tại của element gốc sang clone (phòng trường hợp background đè)
+                clone.style.background = element.style.background || '#FFFFFF';
 
-                // 4. Chụp ảnh
-                const canvas = await html2canvas(element, {
-                    scale: 2,
-                    useCORS: true, // Cho phép tải ảnh từ nguồn khác (nếu có)
-                    allowTaint: true,
+                // Gắn bản sao vào thẳng body
+                document.body.appendChild(clone);
+
+                // 4. Chờ 500ms để trình duyệt render xong hình ảnh trong bản sao
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // 5. Chụp ảnh từ BẢN SAO (clone) chứ không phải bản gốc
+                const canvas = await html2canvas(clone, {
+                    scale: 3, // Tăng lên 3 để ảnh nét hơn
+                    useCORS: true,
                     logging: false,
-                    backgroundColor: null // Giữ nền trong suốt nếu cần
+                    backgroundColor: null,
+                    // Quan trọng: Chỉ định rõ kích thước chụp bằng kích thước thật của clone
+                    width: clone.offsetWidth,
+                    height: clone.offsetHeight,
+                    windowWidth: document.documentElement.offsetWidth,
+                    windowHeight: document.documentElement.offsetHeight
                 });
-
-                // 5. Trả lại hiện trạng cũ (Ẩn bước 3 đi)
-                step3Div.style.position = ''; 
-                step3Div.style.top = '';
-                step3Div.style.left = '';
-                step3Div.style.zIndex = '';
-                step3Div.style.opacity = '';
-                step3Div.classList.add('hidden');
 
                 // 6. Tạo PDF
                 const imgData = canvas.toDataURL('image/png');
-                
-                // Kiểm tra xem ảnh có dữ liệu không
-                if (imgData === 'data:,') {
-                    throw new Error("Không chụp được ảnh, vui lòng thử lại!");
+
+                // Kiểm tra kỹ lại dữ liệu ảnh
+                if (imgData === 'data:,' || canvas.width === 0 || canvas.height === 0) {
+                    throw new Error("Kích thước ảnh bằng 0. Trình duyệt chưa kịp vẽ.");
                 }
 
                 const { jsPDF } = window.jspdf;
@@ -610,27 +619,25 @@
                 const imgWidth = imgProps.width;
                 const imgHeight = imgProps.height;
                 
-                // Tính toán tỷ lệ
-                const finalWidth = 100; 
+                // Tính toán tỷ lệ để căn giữa
+                const finalWidth = 80; // Độ rộng ảnh trong PDF (mm)
                 const finalHeight = (imgHeight * finalWidth) / imgWidth;
                 const x = (pdfWidth - finalWidth) / 2;
                 const y = 20;
 
                 pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
-                pdf.save(`photobooth-meo-${Date.now()}.pdf`);
+                pdf.save(`photobooth-khanhlinh-${Date.now()}.pdf`);
 
             } catch (err) {
-                console.error("Lỗi:", err);
-                alert("Lỗi khi tạo PDF: " + err.message);
+                console.error("Chi tiết lỗi:", err);
+                alert("Lỗi: " + err.message + "\nBạn hãy thử lại lần nữa nhé!");
             } finally {
-                // 7. Dọn dẹp (Luôn chạy dù thành công hay thất bại)
-                step3Div.style.position = ''; 
-                step3Div.style.top = '';
-                step3Div.style.left = '';
-                step3Div.style.zIndex = '';
-                step3Div.style.opacity = '';
-                step3Div.classList.add('hidden');
+                // 7. Dọn dẹp: Xóa bản sao khỏi trang web dù thành công hay thất bại
+                if (clone && document.body.contains(clone)) {
+                    document.body.removeChild(clone);
+                }
                 
+                // Trả lại nút bấm
                 btn.innerHTML = originalText;
                 btn.disabled = false;
             }
@@ -639,6 +646,7 @@
 </body>
 
 </html>
+
 
 
 
