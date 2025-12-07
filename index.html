@@ -1,0 +1,621 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>React - Photobooth by Khánh Linh</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-color: #f0f0f0;
+            --primary: #111;
+            --accent: #3b82f6;
+            --danger: #ef4444;
+        }
+
+        body {
+            font-family: 'Space Mono', monospace;
+            background: var(--bg-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            color: var(--primary);
+        }
+
+        h1, h2, h3 { margin: 0; text-transform: lowercase; }
+
+        /* utilities */
+        .hidden { display: none !important; }
+        .btn {
+            padding: 10px 20px;
+            border: 2px solid var(--primary);
+            background: white;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            transition: 0.2s;
+            text-transform: lowercase;
+        }
+        .btn:hover { background: var(--primary); color: white; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-icon { border-radius: 50%; width: 40px; height: 40px; padding: 0; display: grid; place-items: center; }
+
+        /* container chính */
+        .container {
+            width: 95%;
+            max-width: 1000px;
+            background: white;
+            margin: 20px;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 10px 10px 0px rgba(0,0,0,0.1);
+            min-height: 80vh;
+            position: relative;
+        }
+
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+        }
+
+/* --- style cho logo (vị trí cố định) --- */
+    #logo-container {
+        position: fixed; /* giữ logo cố định trên màn hình */
+        top: 20px; /* cách lề trên 20px */
+        left: 20px; /* cách lề trái 20px */
+        z-index: 100; /* đảm bảo logo luôn nằm trên các thành phần khác */
+        padding: 5px 10px;
+        background: rgba(255, 255, 255, 0.7); /* nền mờ để logo nổi bật */
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    #my-logo {
+        height: 40px; /* điều chỉnh chiều cao của logo */
+        width: auto;
+        display: block;
+    }
+
+        /* --- bước 1: chọn layout --- */
+        #step-1 { text-align: center; padding-top: 50px; }
+        .layout-options {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 40px;
+            flex-wrap: wrap;
+        }
+        .layout-card {
+            border: 2px solid #ddd;
+            padding: 20px;
+            cursor: pointer;
+            border-radius: 12px;
+            transition: 0.2s;
+        }
+        .layout-card:hover { border-color: var(--primary); transform: translateY(-5px); }
+        .mini-frame {
+            background: #eee;
+            margin: 0 auto 10px;
+            border: 1px solid #999;
+        }
+        /* mô phỏng các ô */
+        .grid-3, .grid-4 { width: 40px; display: flex; flex-direction: column; gap: 2px; padding: 4px; }
+        .grid-3 div { height: 30px; background: white; border: 1px solid #ccc; }
+        .grid-4 div { height: 22px; background: white; border: 1px solid #ccc; }
+        
+        .grid-6 { width: 60px; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 4px; }
+        .grid-6 div { height: 25px; background: white; border: 1px solid #ccc; }
+
+        /* --- bước 2: chụp ảnh --- */
+        #step-2 { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .camera-area {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: black;
+        }
+        video { width: 100%; display: block; transform: scaleX(-1); /* lật gương */ }
+        #capture-btn {
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            background: white;
+            border: 4px solid var(--primary);
+            position: absolute;
+            bottom: 20px; left: 50%;
+            transform: translateX(-50%);
+            cursor: pointer;
+        }
+        #capture-btn:active { transform: translateX(-50%) scale(0.9); }
+
+        /* vùng preview ảnh đã chụp */
+        .preview-strip-container {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 10px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        /* --- style chung cho strip ảnh (dùng ở cả bước 2 và 3) --- */
+        .photo-strip {
+            background: white; /* màu mặc định */
+            padding: 15px;
+            display: grid;
+            gap: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            transition: background 0.3s;
+            width: fit-content;
+        }
+        
+        /* dynamic classes for strip layout */
+        .strip-layout-3, .strip-layout-4 {
+            grid-template-columns: 1fr;
+            width: 200px; /* chiều rộng cố định cho strip dọc */
+        }
+        .strip-layout-6 {
+            grid-template-columns: 1fr 1fr;
+            width: 320px; /* rộng hơn cho 2 cột */
+        }
+
+        /* ô ảnh trong strip */
+        .photo-slot {
+            background: #eee;
+            aspect-ratio: 4/3; /* tỉ lệ ảnh */
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .photo-slot img {
+            width: 100%; height: 100%; object-fit: cover;
+            display: block;
+        }
+        .photo-slot .delete-btn {
+            position: absolute;
+            top: 5px; right: 5px;
+            background: rgba(255,0,0,0.8);
+            color: white;
+            border: none;
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px;
+        }
+
+        /* --- bước 3: trang trí --- */
+        #step-3 { display: flex; height: 100%; }
+        .split-view { display: flex; width: 100%; gap: 30px; height: 600px; }
+        
+        .left-preview {
+            flex: 1;
+            background: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            overflow-y: auto;
+        }
+
+        .right-controls {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            justify-content: center;
+        }
+
+        .control-group h3 { margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 5px; }
+        .options-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+        
+        .option-btn {
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            flex: 1;
+            text-align: center;
+            min-width: 80px;
+        }
+        .option-btn.active {
+            border-color: var(--primary);
+            background: var(--primary);
+            color: white;
+        }
+
+        /* màu sắc cho nút frame */
+        .color-btn { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #ddd; cursor: pointer; }
+        .color-btn.active { border-color: var(--accent); transform: scale(1.1); }
+
+        /* css filters */
+        .filter-bright img { filter: brightness(1.2); }
+        .filter-bw img { filter: grayscale(100%); }
+        .filter-none img { filter: none; }
+
+        /* --- bước 4: download --- */
+        #step-4 { text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
+        .success-icon { font-size: 60px; color: #10b981; margin-bottom: 20px; }
+        
+    </style>
+</head>
+<body>
+
+    <div id="logo-container">
+        <img id="my-logo" src="file:///C:/Users/backu/Downloads/Modern%20Bold%20Minimalist%20Black%20and%20Cream%20Cat%20Illustration%20Coffee%20Shop%20Logo.svg" alt="logo meo">
+    </div>
+ 
+
+    <div class="container">
+        <button id="back-btn" class="btn btn-icon back-btn hidden"><i class="fas fa-arrow-left"></i></button>
+
+        <div id="step-1">
+            <h1>Chọn kiểu khung hình</h1>
+            <p>Bắt đầu chụp photobooth online nào bạn ei</p>
+            
+            <div class="layout-options">
+                <div class="layout-card" onclick="selectLayout(3)">
+                    <div class="mini-frame grid-3"><div></div><div></div><div></div></div>
+                    <span>3 ô dọc</span>
+                </div>
+                <div class="layout-card" onclick="selectLayout(4)">
+                    <div class="mini-frame grid-4"><div></div><div></div><div></div><div></div></div>
+                    <span>4 ô dọc</span>
+                </div>
+                <div class="layout-card" onclick="selectLayout(6)">
+                    <div class="mini-frame grid-6"><div></div><div></div><div></div><div></div><div></div><div></div></div>
+                    <span>6 ô (2 cột)</span>
+                </div>
+            </div>
+        </div>
+
+        <div id="step-2" class="hidden">
+            <h2>Hãy cười thật tươi nào 📸</h2>
+            
+            <div class="camera-area">
+                <video id="video" autoplay playsinline></video>
+                <button id="capture-btn"></button>
+            </div>
+
+            <div class="preview-strip-container">
+                <div id="capture-strip" class="photo-strip">
+                    </div>
+            </div>
+
+            <button id="finish-capture-btn" class="btn" onclick="goToStep3()" disabled>tiếp tục trang trí <i class="fas fa-arrow-right"></i></button>
+        </div>
+
+        <div id="step-3" class="hidden">
+            <div class="split-view">
+                <div class="left-preview">
+                    <div id="final-strip" class="photo-strip">
+                        </div>
+                </div>
+
+                <div class="right-controls">
+                    <div class="control-group">
+                        <h3>1. Chọn filter ảnh</h3>
+                        <div class="options-grid" id="filter-options">
+                            <div class="option-btn" onclick="applyFilter('none', this)">gốc</div>
+                            <div class="option-btn" onclick="applyFilter('bright', this)">sáng ✨</div>
+                            <div class="option-btn" onclick="applyFilter('bw', this)">trắng đen 🎬</div>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <h3>2. Chọn màu khung</h3>
+                        <div class="options-grid" id="color-options">
+                            <div class="color-btn" style="background: #A31D1D;" onclick="applyFrameColor('#A31D1D', this)"></div>
+                            <div class="color-btn" style="background: #191919;" onclick="applyFrameColor('#191919', this)"></div>
+                            <div class="color-btn" style="background: #191919;" onclick="applyFrameColor('#0D1164', this)"></div>
+                            <div class="color-btn" style="background: #191919;" onclick="applyFrameColor('#1E5128', this)"></div>
+                            <div class="color-btn" style="background: #FFFFFF; border: 1px solid #ccc;" onclick="applyFrameColor('#FFFFFF', this)"></div>
+                        </div>
+                    </div>
+
+                    <button id="finish-edit-btn" class="btn" onclick="goToStep4()" disabled>xuất ảnh pdf <i class="fas fa-magic"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <div id="step-4" class="hidden">
+            <div class="success-icon"><i class="fas fa-check-circle"></i></div>
+            <h2>xong rồi nè!</h2>
+            <p>Ảnh của bạn đã sẵn sàng để tải xuống.</p>
+            <br>
+            <button class="btn" onclick="downloadPDF()" style="background: var(--primary); color: white;">Tải xuống pdf ngay <i class="fas fa-download"></i></button>
+            <br><br>
+            <button class="btn" onclick="location.reload()">Làm cái nữa không?</button>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script>
+        // --- variables ---
+        let currentStep = 1;
+        let selectedLayout = 0; // 3, 4, or 6
+        let photos = []; // mảng chứa base64 ảnh
+        let stream = null;
+        
+        let selectedFilter = null;
+        let selectedFrameColor = null;
+
+        // --- dom elements ---
+        const steps = [1, 2, 3, 4].map(i => document.getElementById(`step-${i}`));
+        const backBtn = document.getElementById('back-btn');
+        const video = document.getElementById('video');
+        const captureStrip = document.getElementById('capture-strip');
+        const finalStrip = document.getElementById('final-strip');
+        const finishCaptureBtn = document.getElementById('finish-capture-btn');
+        const finishEditBtn = document.getElementById('finish-edit-btn');
+
+        // --- navigation logic ---
+        function showStep(stepNum) {
+            steps.forEach((el, index) => {
+                if (index + 1 === stepNum) el.classList.remove('hidden');
+                else el.classList.add('hidden');
+            });
+            
+            // xử lý nút back
+            if (stepNum === 1) backBtn.classList.add('hidden');
+            else backBtn.classList.remove('hidden');
+
+            currentStep = stepNum;
+        }
+
+        backBtn.onclick = () => {
+            if (currentStep === 2) {
+                stopCamera();
+                photos = []; // reset ảnh nếu quay lại chọn layout
+                showStep(1);
+            } else if (currentStep === 3) {
+                // reset lựa chọn ở bước 3
+                selectedFilter = null;
+                selectedFrameColor = null;
+                updateEditButtonState();
+                // xóa class active cũ
+                document.querySelectorAll('.active').forEach(el => el.classList.remove('active'));
+                
+                // quay lại camera, giữ nguyên ảnh cũ
+                initCamera();
+                showStep(2);
+            } else if (currentStep === 4) {
+                showStep(3);
+            }
+        };
+
+        // --- step 1 logic ---
+        function selectLayout(num) {
+            selectedLayout = num;
+            photos = new Array(num).fill(null); // tạo mảng rỗng có độ dài = num
+            initCamera();
+            renderCaptureGrid();
+            showStep(2);
+        }
+
+        // --- step 2 logic: camera & capture ---
+        async function initCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+                video.srcObject = stream;
+            } catch (err) {
+                alert("Không tìm thấy camera rồi bạn ơi :( Kiểm tra quyền truy cập nhé.");
+            }
+        }
+
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+        }
+
+        function renderCaptureGrid() {
+            captureStrip.className = `photo-strip strip-layout-${selectedLayout}`;
+            captureStrip.innerHTML = '';
+
+            photos.forEach((photo, index) => {
+                const slot = document.createElement('div');
+                slot.className = 'photo-slot';
+                
+                if (photo) {
+                    // đã có ảnh
+                    const img = document.createElement('img');
+                    img.src = photo;
+                    
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'delete-btn';
+                    delBtn.innerHTML = '<i class="fas fa-times"></i>';
+                    delBtn.onclick = () => deletePhoto(index);
+
+                    slot.appendChild(img);
+                    slot.appendChild(delBtn);
+                } else {
+                    // chưa có ảnh
+                    slot.innerText = index + 1;
+                    slot.style.color = '#ccc';
+                }
+                captureStrip.appendChild(slot);
+            });
+
+            // check if full to enable next button
+            const isFull = photos.every(p => p !== null);
+            finishCaptureBtn.disabled = !isFull;
+        }
+
+        document.getElementById('capture-btn').onclick = () => {
+            // tìm slot trống đầu tiên
+            const emptyIndex = photos.indexOf(null);
+            if (emptyIndex === -1) return; // đã đầy
+
+            // chụp ảnh từ video
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            
+            // lật ảnh cho giống gương
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            photos[emptyIndex] = canvas.toDataURL('image/png');
+            renderCaptureGrid();
+        };
+
+        function deletePhoto(index) {
+            photos[index] = null;
+            renderCaptureGrid();
+        }
+
+        function goToStep3() {
+            stopCamera();
+            renderFinalStrip();
+            showStep(3);
+        }
+
+        // --- step 3 logic: editor ---
+        function renderFinalStrip() {
+            finalStrip.className = `photo-strip strip-layout-${selectedLayout}`;
+            finalStrip.innerHTML = '';
+            // reset style
+            finalStrip.style.background = '#FFFFFF'; 
+
+            photos.forEach(photo => {
+                const slot = document.createElement('div');
+                slot.className = 'photo-slot'; // mặc định class
+                
+                const img = document.createElement('img');
+                img.src = photo;
+                slot.appendChild(img);
+                finalStrip.appendChild(slot);
+            });
+        }
+
+        function applyFilter(filterType, btnElement) {
+            selectedFilter = filterType;
+            
+            // update UI buttons
+            document.querySelectorAll('#filter-options .option-btn').forEach(b => b.classList.remove('active'));
+            btnElement.classList.add('active');
+
+            // update visual strip
+            const slots = finalStrip.querySelectorAll('.photo-slot');
+            slots.forEach(slot => {
+                slot.className = 'photo-slot'; // reset
+                if (filterType === 'bright') slot.classList.add('filter-bright');
+                if (filterType === 'bw') slot.classList.add('filter-bw');
+                if (filterType === 'none') slot.classList.add('filter-none');
+            });
+
+            updateEditButtonState();
+        }
+
+        function applyFrameColor(colorCode, btnElement) {
+            selectedFrameColor = colorCode;
+
+            // update UI buttons
+            document.querySelectorAll('#color-options .color-btn').forEach(b => b.classList.remove('active'));
+            btnElement.classList.add('active');
+
+            // update visual strip
+            finalStrip.style.background = colorCode;
+
+            updateEditButtonState();
+        }
+
+        function updateEditButtonState() {
+            // bắt buộc chọn cả 2 mới được đi tiếp
+            if (selectedFilter && selectedFrameColor) {
+                finishEditBtn.disabled = false;
+            } else {
+                finishEditBtn.disabled = true;
+            }
+        }
+
+        function goToStep4() {
+            showStep(4);
+        }
+
+        // --- step 4: download pdf ---
+        window.jsPDF = window.jspdf.jsPDF;
+
+        async function downloadPDF() {
+            const element = document.getElementById('final-strip');
+            const step3Div = document.getElementById('step-3');
+            const btn = document.querySelector('#step-4 button'); 
+            
+            // 1. Báo hiệu đang xử lý
+            const originalText = btn.innerHTML;
+            btn.innerHTML = 'đang xử lý... <i class="fas fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+
+            try {
+                // 2. TRICK QUAN TRỌNG: Phải làm cho element hiện ra thì mới chụp được
+                // Ta sẽ lén hiển thị bước 3 nhưng đẩy nó ra khỏi màn hình để người dùng không thấy bị giật
+                step3Div.classList.remove('hidden');
+                step3Div.style.position = 'absolute';
+                step3Div.style.left = '-9999px'; // Đẩy ra xa tít mù khơi
+                
+                // 3. Chụp ảnh
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                });
+
+                // 4. Trả lại hiện trạng cũ ngay lập tức (Ẩn bước 3 đi)
+                step3Div.style.position = ''; 
+                step3Div.style.left = '';
+                step3Div.classList.add('hidden');
+
+                // 5. Tạo PDF
+                const imgData = canvas.toDataURL('image/png');
+                const { jsPDF } = window.jspdf; // Lấy jsPDF chuẩn từ window
+                const pdf = new jsPDF('p', 'mm', 'a4');
+                
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const imgProps = pdf.getImageProperties(imgData);
+                const imgWidth = imgProps.width;
+                const imgHeight = imgProps.height;
+                
+                const finalWidth = 100; 
+                const finalHeight = (imgHeight * finalWidth) / imgWidth;
+                const x = (pdfWidth - finalWidth) / 2;
+                const y = 20;
+
+                pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
+                pdf.save(`photobooth-meo-${Date.now()}.pdf`);
+
+                // 6. Xong việc
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+
+            } catch (err) {
+                console.error("Lỗi rồi bạn ơi:", err);
+                alert("Có lỗi khi tạo PDF: " + err.message);
+                
+                // Dù lỗi cũng phải dọn dẹp hiện trường (trả lại style cũ)
+                step3Div.style.position = ''; 
+                step3Div.style.left = '';
+                step3Div.classList.add('hidden');
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
