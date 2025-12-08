@@ -355,7 +355,7 @@
         let selectedFrameColor = null;
 
         // --- dom elements ---
-        const steps = [1, 2, 3, 4].map(i => document.getElementById(`step-${i}`));
+        const steps = [1, 2, 3, 4].map(i => document.getElementById('step-' + i));
         const backBtn = document.getElementById('back-btn');
         const video = document.getElementById('video');
         const captureStrip = document.getElementById('capture-strip');
@@ -552,11 +552,18 @@
         }
 
         // --- step 4: download pdf ---
-        window.jsPDF = window.jspdf.jsPDF;
 
            // --- SỬA LẠI HÀM NÀY (CÁCH CLONE) ---
       // --- HÀM DOWNLOAD ĐÃ SỬA LỖI FILTER ---
         async function downloadPDF() {
+            // Thêm dòng kiểm tra thư viện ở đây
+    if (!window.jspdf) {
+        alert("Lỗi: Không tải được thư viện PDF. Hãy kiểm tra kết nối mạng!");
+        return;
+    }
+    window.jsPDF = window.jspdf.jsPDF; // Gán biến ở đây
+
+    const element = document.getElementById('final-strip');
             const element = document.getElementById('final-strip');
             const btn = document.querySelector('#step-4 button'); 
 
@@ -683,6 +690,7 @@
 </body>
 
 </html>
+
 
 
 
