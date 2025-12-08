@@ -355,7 +355,7 @@
         let selectedFrameColor = null;
 
         // --- dom elements ---
-        const steps = [1, 2, 3, 4].map(i => document.getElementById('step-' + i));
+        const steps = [1, 2, 3, 4].map(i => document.getElementById(`step-${i}`));
         const backBtn = document.getElementById('back-btn');
         const video = document.getElementById('video');
         const captureStrip = document.getElementById('capture-strip');
@@ -552,21 +552,13 @@
         }
 
         // --- step 4: download pdf ---
+        window.jsPDF = window.jspdf.jsPDF;
 
-           // --- SỬA LẠI HÀM NÀY (CÁCH CLONE) ---
-      // --- HÀM DOWNLOAD ĐÃ SỬA LỖI FILTER ---
+        // --- SỬA LẠI HÀM NÀY (CÁCH CLONE) ---
         async function downloadPDF() {
-            // Thêm dòng kiểm tra thư viện ở đây
-    if (!window.jspdf) {
-        alert("Lỗi: Không tải được thư viện PDF. Hãy kiểm tra kết nối mạng!");
-        return;
-    }
-    window.jsPDF = window.jspdf.jsPDF; // Gán biến ở đây
-
-    const element = document.getElementById('final-strip');
             const element = document.getElementById('final-strip');
             const btn = document.querySelector('#step-4 button'); 
-
+            
             // 1. Báo hiệu đang xử lý
             const originalText = btn.innerHTML;
             btn.innerHTML = 'đang xử lý... <i class="fas fa-spinner fa-spin"></i>';
@@ -578,58 +570,29 @@
             try {
                 // 2. TẠO BẢN SAO (CLONE) của dải ảnh
                 // Chúng ta copy y nguyên dải ảnh ra một cái mới
-                // 2. TẠO BẢN SAO
                 clone = element.cloneNode(true);
 
                 // 3. Thiết lập style bắt buộc cho bản sao để nó luôn hiện
                 // Đưa nó ra khỏi màn hình (-10000px) nhưng vẫn để chế độ hiển thị
-                // --- ĐOẠN CODE MỚI THÊM VÀO ĐỂ SỬA LỖI FILTER ---
-                // Lý do: html2canvas đôi khi không nhận CSS Class filter trên bản clone
-                // Giải pháp: Copy filter từ bản gốc và gán cứng vào style (inline style) của bản clone
-                const originalSlots = element.querySelectorAll('.photo-slot');
-                const clonedSlots = clone.querySelectorAll('.photo-slot');
-
-                originalSlots.forEach((slot, index) => {
-                    // Kiểm tra xem slot gốc đang dùng filter gì
-                    if (slot.classList.contains('filter-bw')) {
-                        // Tìm ảnh tương ứng trong bản clone và ép style
-                        const img = clonedSlots[index].querySelector('img');
-                        if (img) img.style.filter = 'grayscale(100%)';
-                    } 
-                    else if (slot.classList.contains('filter-bright')) {
-                        const img = clonedSlots[index].querySelector('img');
-                        if (img) img.style.filter = 'brightness(1.2)';
-                    }
-                });
-                // ----------------------------------------------------
-
-                // 3. Setup vị trí cho bản sao (như cũ)
                 clone.style.position = 'fixed';
                 clone.style.left = '-10000px'; 
                 clone.style.top = '0px';
                 clone.style.zIndex = '-1';
                 clone.style.display = 'grid'; // Bắt buộc dùng grid giống CSS gốc
                 clone.style.visibility = 'visible'; // Bắt buộc hiện
-                clone.style.display = 'grid'; 
-                clone.style.visibility = 'visible';
-
+                
                 // Copy background màu hiện tại của element gốc sang clone (phòng trường hợp background đè)
-                // Copy background
                 clone.style.background = element.style.background || '#FFFFFF';
 
                 // Gắn bản sao vào thẳng body
-                // Gắn vào body
                 document.body.appendChild(clone);
 
                 // 4. Chờ 500ms để trình duyệt render xong hình ảnh trong bản sao
-                // 4. Chờ render
                 await new Promise(resolve => setTimeout(resolve, 500));
 
                 // 5. Chụp ảnh từ BẢN SAO (clone) chứ không phải bản gốc
-                // 5. Chụp ảnh
                 const canvas = await html2canvas(clone, {
                     scale: 3, // Tăng lên 3 để ảnh nét hơn
-                    scale: 3, 
                     useCORS: true,
                     logging: false,
                     backgroundColor: null,
@@ -638,7 +601,6 @@
                     height: clone.offsetHeight,
                     windowWidth: document.documentElement.offsetWidth,
                     windowHeight: document.documentElement.offsetHeight
-                    height: clone.offsetHeight
                 });
 
                 // 6. Tạo PDF
@@ -647,34 +609,28 @@
                 // Kiểm tra kỹ lại dữ liệu ảnh
                 if (imgData === 'data:,' || canvas.width === 0 || canvas.height === 0) {
                     throw new Error("Kích thước ảnh bằng 0. Trình duyệt chưa kịp vẽ.");
-                if (imgData === 'data:,' || canvas.width === 0) {
-                    throw new Error("Lỗi ảnh rỗng");
                 }
 
                 const { jsPDF } = window.jspdf;
                 const pdf = new jsPDF('p', 'mm', 'a4');
-
+                
                 const pdfWidth = pdf.internal.pageSize.getWidth();
                 const imgProps = pdf.getImageProperties(imgData);
                 const imgWidth = imgProps.width;
                 const imgHeight = imgProps.height;
-
+                
                 // Tính toán tỷ lệ để căn giữa
                 const finalWidth = 80; // Độ rộng ảnh trong PDF (mm)
-                const finalWidth = 80; 
                 const finalHeight = (imgHeight * finalWidth) / imgWidth;
                 const x = (pdfWidth - finalWidth) / 2;
                 const y = 20;
 
                 pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
-                pdf.save(`Photobooth-React-${Date.now()}.pdf`);
-                pdf.save(`React-photobooth-bykhanhlinh-${Date.now()}.pdf`);
+                pdf.save(`photobooth-khanhlinh-${Date.now()}.pdf`);
 
             } catch (err) {
                 console.error("Chi tiết lỗi:", err);
                 alert("Lỗi: " + err.message + "\nBạn hãy thử lại lần nữa nhé!");
-                console.error("Lỗi:", err);
-                alert("Có lỗi xảy ra: " + err.message);
             } finally {
                 // 7. Dọn dẹp: Xóa bản sao khỏi trang web dù thành công hay thất bại
                 if (clone && document.body.contains(clone)) {
@@ -690,16 +646,6 @@
 </body>
 
 </html>
-
-
-
-
-
-
-
-
-
-
 
 
 
