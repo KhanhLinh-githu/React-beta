@@ -559,7 +559,9 @@
         async function downloadPDF() {
             const element = document.getElementById('final-strip');
             const btn = document.querySelector('#step-4 button'); 
-@@ -564,51 +564,64 @@ <h2>xong rồi nè!</h2>
+
+            // 1. Báo hiệu đang xử lý
+            const originalText = btn.innerHTML;
             btn.innerHTML = 'đang xử lý... <i class="fas fa-spinner fa-spin"></i>';
             btn.disabled = true;
 
@@ -643,7 +645,10 @@
                 }
 
                 const { jsPDF } = window.jspdf;
-@@ -619,25 +632,21 @@ <h2>xong rồi nè!</h2>
+                const pdf = new jsPDF('p', 'mm', 'a4');
+
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const imgProps = pdf.getImageProperties(imgData);
                 const imgWidth = imgProps.width;
                 const imgHeight = imgProps.height;
 
@@ -678,6 +683,7 @@
 </body>
 
 </html>
+
 
 
 
