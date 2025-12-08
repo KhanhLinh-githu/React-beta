@@ -554,7 +554,7 @@
         // --- step 4: download pdf ---
         window.jsPDF = window.jspdf.jsPDF;
 
-      // --- HÀM DOWNLOAD ĐÃ SỬA LỖI FILTER ---
+      // --- HÀM DOWNLOAD ĐÃ NÂNG CẤP (FIX LỖI FILTER 100%) ---
         async function downloadPDF() {
             const element = document.getElementById('final-strip');
             const btn = document.querySelector('#step-4 button'); 
@@ -570,49 +570,65 @@
                 // 2. TẠO BẢN SAO
                 clone = element.cloneNode(true);
 
-                // --- ĐOẠN CODE MỚI THÊM VÀO ĐỂ SỬA LỖI FILTER ---
-                // Lý do: html2canvas đôi khi không nhận CSS Class filter trên bản clone
-                // Giải pháp: Copy filter từ bản gốc và gán cứng vào style (inline style) của bản clone
+                // 3. SETUP VỊ TRÍ CHO BẢN SAO (Để html2canvas nhìn thấy)
+                // Ta để nó hiển thị nhưng nằm dưới cùng (z-index âm) để người dùng không thấy bị nháy
+                clone.style.position = 'fixed';
+                clone.style.left = '0px'; 
+                clone.style.top = '0px';
+                clone.style.zIndex = '-9999'; 
+                clone.style.pointerEvents = 'none'; // Không cho click vào
+                clone.style.display = 'grid'; 
+                clone.style.visibility = 'visible';
+                
+                // Copy background từ bản gốc
+                // Nếu đang dùng custom frame (ảnh png) thì background phải trong suốt
+                // Nếu dùng màu thì lấy màu đó
+                if (typeof isCustomFrame !== 'undefined' && isCustomFrame) {
+                     clone.style.background = 'transparent';
+                } else {
+                     clone.style.background = element.style.background || '#FFFFFF';
+                }
+
+                // GẮN VÀO BODY TRƯỚC (Quan trọng: Phải gắn vào DOM thì mới chỉnh sửa style hiệu quả)
+                document.body.appendChild(clone);
+
+                // --- BƯỚC QUAN TRỌNG NHẤT: ÉP STYLE FILTER ---
+                // Chúng ta sẽ lấy danh sách các ô ảnh gốc và bản sao
                 const originalSlots = element.querySelectorAll('.photo-slot');
                 const clonedSlots = clone.querySelectorAll('.photo-slot');
 
                 originalSlots.forEach((slot, index) => {
-                    // Kiểm tra xem slot gốc đang dùng filter gì
+                    const cloneSlot = clonedSlots[index];
+                    const cloneImg = cloneSlot.querySelector('img');
+
+                    // Kiểm tra xem ô gốc đang có class filter nào
                     if (slot.classList.contains('filter-bw')) {
-                        // Tìm ảnh tương ứng trong bản clone và ép style
-                        const img = clonedSlots[index].querySelector('img');
-                        if (img) img.style.filter = 'grayscale(100%)';
+                        // Ép style trực tiếp vào cả thẻ DIV và thẻ IMG của bản sao
+                        // Thêm cả -webkit- để hỗ trợ mọi trình duyệt
+                        if (cloneImg) {
+                            cloneImg.style.filter = 'grayscale(100%)';
+                            cloneImg.style.webkitFilter = 'grayscale(100%)'; 
+                        }
                     } 
                     else if (slot.classList.contains('filter-bright')) {
-                        const img = clonedSlots[index].querySelector('img');
-                        if (img) img.style.filter = 'brightness(1.2)';
+                        if (cloneImg) {
+                            cloneImg.style.filter = 'brightness(1.2)';
+                            cloneImg.style.webkitFilter = 'brightness(1.2)';
+                        }
                     }
                 });
                 // ----------------------------------------------------
 
-                // 3. Setup vị trí cho bản sao (như cũ)
-                clone.style.position = 'fixed';
-                clone.style.left = '-10000px'; 
-                clone.style.top = '0px';
-                clone.style.zIndex = '-1';
-                clone.style.display = 'grid'; 
-                clone.style.visibility = 'visible';
-                
-                // Copy background
-                clone.style.background = element.style.background || '#FFFFFF';
-
-                // Gắn vào body
-                document.body.appendChild(clone);
-
-                // 4. Chờ render
+                // 4. Chờ 500ms để trình duyệt kịp vẽ hiệu ứng filter lên bản sao
                 await new Promise(resolve => setTimeout(resolve, 500));
 
                 // 5. Chụp ảnh
                 const canvas = await html2canvas(clone, {
-                    scale: 3, 
-                    useCORS: true,
+                    scale: 3, // Độ phân giải cao
+                    useCORS: true, // Cho phép tải ảnh
+                    allowTaint: true,
                     logging: false,
-                    backgroundColor: null,
+                    backgroundColor: null, // Giữ nền trong suốt
                     width: clone.offsetWidth,
                     height: clone.offsetHeight
                 });
@@ -620,8 +636,9 @@
                 // 6. Tạo PDF
                 const imgData = canvas.toDataURL('image/png');
 
+                // Kiểm tra ảnh rỗng
                 if (imgData === 'data:,' || canvas.width === 0) {
-                    throw new Error("Lỗi ảnh rỗng");
+                    throw new Error("Lỗi ảnh rỗng (Trình duyệt chưa kịp vẽ)");
                 }
 
                 const { jsPDF } = window.jspdf;
@@ -632,18 +649,20 @@
                 const imgWidth = imgProps.width;
                 const imgHeight = imgProps.height;
                 
+                // Tính toán tỷ lệ
                 const finalWidth = 80; 
                 const finalHeight = (imgHeight * finalWidth) / imgWidth;
                 const x = (pdfWidth - finalWidth) / 2;
                 const y = 20;
 
                 pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight);
-                pdf.save(`React-photobooth-bykhanhlinh-${Date.now()}.pdf`);
+                pdf.save(`React-photoboothbykhanhlinh-${Date.now()}.pdf`);
 
             } catch (err) {
                 console.error("Lỗi:", err);
                 alert("Có lỗi xảy ra: " + err.message);
             } finally {
+                // 7. Dọn dẹp bản sao
                 if (clone && document.body.contains(clone)) {
                     document.body.removeChild(clone);
                 }
@@ -655,6 +674,7 @@
 </body>
 
 </html>
+
 
 
 
